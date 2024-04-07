@@ -292,6 +292,7 @@ void power_sequence(const unsigned long now) {
 }
 
 
+// lower value is more current
 // around 512 it "no current"
 // however I've sen 506-512 values in this state
 const int thresh = 498;
@@ -299,6 +300,7 @@ const int thresh = 498;
 unsigned long last_hdd_on = 0; // time that we've last seen the hdd's on
 unsigned long hdd_fan_coast = 60000; // time that fans stay on beyond hdd spindown
 int last_fan = 1;
+int fan_one_click = 1;
 
 void read_hdd_current(const unsigned long now) {
   // Serial.println("Function 1 called at time: " + String(now));
@@ -317,6 +319,7 @@ void read_hdd_current(const unsigned long now) {
       Serial.println("Fans turned on with a current of: " + String(current));
     }
     last_fan = 1;
+    fan_one_click = 1;
   }
 
   // could go in an else, but functionally is in an "else" due to value of last_hdd_on
@@ -332,6 +335,15 @@ void read_hdd_current(const unsigned long now) {
 // #endif
   } else if (current > thresh) {
     Serial.println("Fans Coasting");
+    
+    // notify that we know that power is off
+    // but still coast
+    if(fan_one_click) {
+      fan_one_click = 0;
+      fan(0);
+      delay(50);
+      fan(1);
+    }
   }
 
   #ifdef VERBOSE_FAN_CURRENT
