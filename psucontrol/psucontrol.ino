@@ -150,7 +150,7 @@ void power_sequence(const unsigned long now) {
   case STATE_CPU_ON:
     // two second lockout before this state will run
     // waitb must be set before asking to switch to STATE_CPU_ON
-    if( (now-waitb) < 2000 ) {
+    if( (now-waitb) < 3000 ) {
       break;
     }
 
@@ -162,12 +162,15 @@ void power_sequence(const unsigned long now) {
     nuc_power_button(!digitalRead(POWER_BUTTON_PIN));
 
     if(!digitalRead(NUC_USB_PIN)) {
+      Serial.println("turning PSU off");
+      psu_control(false);
       cstate = STATE_OFF_ASK;
       ps();
       delay(300);
       while(!digitalRead(POWER_BUTTON_PIN)) {
         Serial.println("blocking while button is held");
       }
+      ps();
     }
 
     break;
