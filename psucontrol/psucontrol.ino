@@ -1,5 +1,5 @@
 
-#define USE_DEBUG_BUTTON
+// #define USE_DEBUG_BUTTON
 
 // 13 output to relay
 // 12 is input from fan
@@ -13,15 +13,19 @@ const int NUC_USB_PIN = A0; // measure the USB power of the nuc's yellow USB por
 const int NUC_POWER_PIN = 6; // output to "press" (control) the power button on the nuc
 const int POWER_BUTTON_PIN = 4; // Human press this to turn the system on
 const int PSU_CONTROL_PIN = 9; // Control green "Switch" line on the PSU
+const int STAY_ON_SWITCH_PIN = 10; // allow reboots in this messed up system
 
 #ifdef USE_DEBUG_BUTTON
 const int ADJUST_PIN = 12;
 #endif
 
 
+#define sprint Serial.println
+
+
 // off time PSU needs to be off during a reboot
 // const int PSU_OFF_REBOOT_TIME = 500;
-int PSU_OFF_REBOOT_TIME = 1000;
+int PSU_OFF_REBOOT_TIME = 6000;
 
 #define VERBOSE
 
@@ -73,6 +77,9 @@ void setup() {
 
   pinMode(FAN_RELAY_PIN, OUTPUT);
   fan(1);
+
+
+  pinMode(STAY_ON_SWITCH_PIN, INPUT_PULLUP);
 
   
 #ifdef USE_DEBUG_BUTTON
@@ -137,11 +144,23 @@ void power_sequence(const unsigned long now) {
   switch (cstate) {
   case STATE_OFF_FRESH:
     ps();
-    // what happens if cpu is already on?
-    waita = now;
-    psu_control(true);
-    cstate = STATE_OFF_WAIT;
-    ps();
+    
+    // If asked to power on
+    if(!digitalRead(STAY_ON_SWITCH_PIN)) {
+      waita = now;
+      psu_control(true);
+      sprint("Stay-ON at first power");
+      cstate = STATE_OFF_WAIT;
+      ps();
+    } else {
+      // asked to power off
+      sprint("Stay-OFF at first power");
+      cstate = STATE_OFF_ASK_2;
+      ps();
+      psu_control(false); // redundant
+      waitd_oneshot = 0; // don't check for glitch
+    }
+    
     break;
   case STATE_OFF_ASK:
 
@@ -152,10 +171,9 @@ void power_sequence(const unsigned long now) {
     if( (now-waitc) < PSU_OFF_REBOOT_TIME ) {
       break;
     }
-    Serial.println("glitch PSU on");
-    psu_control(true);
+    // Serial.println("glitch PSU on");
+    psu_control(false); // redundant
     waitd = now;
-
     cstate = STATE_OFF_ASK_2;
     waitd_oneshot = 1;
     ps();
@@ -166,23 +184,35 @@ void power_sequence(const unsigned long now) {
     // when here, we've pulsed the PSU off, then back on
     // now we need to wait and decide if it should ultimately be turned off
 
-    if( (now-waitd) > 15000 && waitd_oneshot == 1) {
-      // cpu is actually off
-      // PSU off
-      psu_control(false);
-      // delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
-      delay(2000); // prevent case where button is pressed on this frame
-      // in this case we need the same delay as before
-      waitd_oneshot = 0;
-      Serial.println("system really was off, turning off PSU");
-    }
+    // if( (now-waitd) > 15000 && waitd_oneshot == 1) {
+    //   // cpu is actually off
+    //   // PSU off
+    //   psu_control(false);
+    //   // delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
+    //   delay(2000); // prevent case where button is pressed on this frame
+    //   // in this case we need the same delay as before
+    //   waitd_oneshot = 0;
+    //   Serial.println("system really was off, turning off PSU");
+    // }
+
+
 
     // what happens if cpu is already on?
     // waita = now;
     // psu_control(true);
     // cstate = STATE_OFF_WAIT;
+
+    // if the "stay on" switch is active
+    if(!digitalRead(STAY_ON_SWITCH_PIN)) {
+      cstate = STATE_OFF_WAIT;
+      psu_control(true);
+      ps();
+    }
+
+    // if you pressed the button
     if(!digitalRead(POWER_BUTTON_PIN)) {
-      cstate = STATE_OFF_FRESH;
+      cstate = STATE_OFF_WAIT;
+      psu_control(true);
       ps();
     }
 
@@ -213,7 +243,7 @@ void power_sequence(const unsigned long now) {
   case STATE_CPU_ON:
     // two second lockout before this state will run
     // waitb must be set before asking to switch to STATE_CPU_ON
-    if( (now-waitb) < 3000 ) {
+    if( (now-waitb) < 5000 ) {
       break;
     }
 
@@ -307,7 +337,8 @@ void debug_button(const unsigned long now) {
 #endif
 
 // Array of function pointers
-Runnable functions[] = {power_sequence, debug_button};
+// Runnable functions[] = {power_sequence, debug_button};
+Runnable functions[] = {power_sequence};
 // Runnable functions[] = {read_hdd_current};
 // Runnable functions[] = {read_hdd_current, function2};
 
