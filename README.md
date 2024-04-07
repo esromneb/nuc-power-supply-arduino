@@ -11,6 +11,14 @@ left:   gnd     (gray)
 center: out     (purple)
 right:  vcc     (blue)
 
+## Leads
+
+Green (ground) and Yellow:   Momentary Switch
+Yellow (Ground) and Orange:  "Stay On" Switch
+Black (Ground) and White:    USB cable, plug into yellow port on NUC
+Blue (ground) and Green:     PSU 24 pin connector
+Brown (ground) and Red:      Power switch of NUC
+
 
 # DC Fan Control Reylay
 Connected to NC so that if arduino is unplugged, default is fans ON

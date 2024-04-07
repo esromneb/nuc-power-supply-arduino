@@ -27,7 +27,7 @@ const int ADJUST_PIN = 12;
 // const int PSU_OFF_REBOOT_TIME = 500;
 int PSU_OFF_REBOOT_TIME = 6000;
 
-#define VERBOSE
+// #define VERBOSE_FAN_CURRENT
 
 void fan(bool on) {
   // LOW is on
@@ -284,30 +284,52 @@ void power_sequence(const unsigned long now) {
 }
 
 
-const int thresh = 506;
+// around 512 it "no current"
+// however I've sen 506-512 values in this state
+const int thresh = 498;
+
 unsigned long last_hdd_on = 0; // time that we've last seen the hdd's on
-unsigned long hdd_fan_coast = 3000; // time that fans stay on beyond hdd spindown
+unsigned long hdd_fan_coast = 60000; // time that fans stay on beyond hdd spindown
+int last_fan = 1;
 
 void read_hdd_current(const unsigned long now) {
-  // Code for function 1
-  // Do something with the time value
   // Serial.println("Function 1 called at time: " + String(now));
+
+  // get drive current
   const int current = analogRead(CURRENT_PIN);
+
+  #ifdef VERBOSE_FAN_CURRENT
+  Serial.print("Fan Current " + String(current) + ": ");
+  #endif
 
   if( current <= thresh ) {
     last_hdd_on = now;
     fan(1); // Fans on
-#ifdef VERBOSE
-    Serial.println("Fans turned on with a current of: " + String(current));
-#endif
+    if( 1 != last_fan) {
+      Serial.println("Fans turned on with a current of: " + String(current));
+    }
+    last_fan = 1;
   }
 
+  // could go in an else, but functionally is in an "else" due to value of last_hdd_on
   if( now - last_hdd_on >= hdd_fan_coast ) {
     fan(0); // Fans off
-#ifdef VERBOSE
-    Serial.println("Fans turned off at time: " + String(now));
-#endif
+    if( 0 != last_fan) {
+      Serial.println("Fans turned off with a current of: " + String(current));
+    }
+    last_fan = 0;
+
+// #ifdef VERBOSE_FAN_CURRENT
+    // Serial.println("Fans turned off at time: " + String(now));
+// #endif
+  } else if (current > thresh) {
+    Serial.println("Fans Coasting");
   }
+
+  #ifdef VERBOSE_FAN_CURRENT
+    sprint(""); // get the newline for above
+  #endif
+
 }
 
 void function2(const unsigned long now) {
@@ -338,7 +360,8 @@ void debug_button(const unsigned long now) {
 
 // Array of function pointers
 // Runnable functions[] = {power_sequence, debug_button};
-Runnable functions[] = {power_sequence};
+// Runnable functions[] = {power_sequence};
+Runnable functions[] = {power_sequence, read_hdd_current};
 // Runnable functions[] = {read_hdd_current};
 // Runnable functions[] = {read_hdd_current, function2};
 
@@ -348,7 +371,7 @@ const int num_runnable = ARRAY_SIZE(functions);
 unsigned long last_run[] = {0, 0};
 
 // Array of periods
-unsigned long period[] = {10, 100, 99999};
+unsigned long period[] = {10, 1000, 99999};
 
 
 
