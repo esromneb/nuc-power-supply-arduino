@@ -21,7 +21,7 @@ const int ADJUST_PIN = 12;
 
 // off time PSU needs to be off during a reboot
 // const int PSU_OFF_REBOOT_TIME = 500;
-int PSU_OFF_REBOOT_TIME = 50;
+int PSU_OFF_REBOOT_TIME = 1000;
 
 #define VERBOSE
 
@@ -166,11 +166,12 @@ void power_sequence(const unsigned long now) {
     // when here, we've pulsed the PSU off, then back on
     // now we need to wait and decide if it should ultimately be turned off
 
-    if( (now-waitd) > 20000 && waitd_oneshot == 1) {
+    if( (now-waitd) > 15000 && waitd_oneshot == 1) {
       // cpu is actually off
       // PSU off
       psu_control(false);
-      delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
+      // delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
+      delay(2000); // prevent case where button is pressed on this frame
       // in this case we need the same delay as before
       waitd_oneshot = 0;
       Serial.println("system really was off, turning off PSU");
@@ -292,9 +293,9 @@ void debug_button(const unsigned long now) {
   
 
   if( current && current != button_previous) {
-    PSU_OFF_REBOOT_TIME += 100;
-    if( PSU_OFF_REBOOT_TIME > 1500) {
-      PSU_OFF_REBOOT_TIME = 50;
+    PSU_OFF_REBOOT_TIME += 1000;
+    if( PSU_OFF_REBOOT_TIME > 10000) {
+      PSU_OFF_REBOOT_TIME = 1000;
     }
     Serial.println("New delay " + String(PSU_OFF_REBOOT_TIME));
   }
