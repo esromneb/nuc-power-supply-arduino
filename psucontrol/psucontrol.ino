@@ -1,4 +1,6 @@
 
+#define USE_DEBUG_BUTTON
+
 // 13 output to relay
 // 12 is input from fan
 // 2 is a copy fo the 5v (wired to 5v from the 2nd usb (not the one onboard the arduino))
@@ -12,9 +14,14 @@ const int NUC_POWER_PIN = 6; // output to "press" (control) the power button on 
 const int POWER_BUTTON_PIN = 4; // Human press this to turn the system on
 const int PSU_CONTROL_PIN = 9; // Control green "Switch" line on the PSU
 
+#ifdef USE_DEBUG_BUTTON
+const int ADJUST_PIN = 12;
+#endif
+
 
 // off time PSU needs to be off during a reboot
-const int PSU_OFF_REBOOT_TIME = 500;
+// const int PSU_OFF_REBOOT_TIME = 500;
+int PSU_OFF_REBOOT_TIME = 50;
 
 #define VERBOSE
 
@@ -68,6 +75,9 @@ void setup() {
   fan(1);
 
   
+#ifdef USE_DEBUG_BUTTON
+  pinMode(ADJUST_PIN, INPUT_PULLUP);
+#endif
   
   // digitalWrite(13, LOW);
 
@@ -275,8 +285,28 @@ void function2(const unsigned long now) {
   Serial.println("Function 2 called at time: " + String(now));
 }
 
+#ifdef USE_DEBUG_BUTTON
+void debug_button(const unsigned long now) {
+  static bool button_previous = 1;
+  int current = digitalRead(ADJUST_PIN);
+  
+
+  if( current && current != button_previous) {
+    PSU_OFF_REBOOT_TIME += 100;
+    if( PSU_OFF_REBOOT_TIME > 1500) {
+      PSU_OFF_REBOOT_TIME = 50;
+    }
+    Serial.println("New delay " + String(PSU_OFF_REBOOT_TIME));
+  }
+
+  button_previous = current;
+
+
+}
+#endif
+
 // Array of function pointers
-Runnable functions[] = {power_sequence};
+Runnable functions[] = {power_sequence, debug_button};
 // Runnable functions[] = {read_hdd_current};
 // Runnable functions[] = {read_hdd_current, function2};
 
@@ -286,7 +316,7 @@ const int num_runnable = ARRAY_SIZE(functions);
 unsigned long last_run[] = {0, 0};
 
 // Array of periods
-unsigned long period[] = {10, 99999};
+unsigned long period[] = {10, 100, 99999};
 
 
 
