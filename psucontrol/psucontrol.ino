@@ -7,9 +7,10 @@
 const int POWER_COPY = 2;
 const int CURRENT_PIN = A1; // drive current pin
 const int FAN_RELAY_PIN = 3; // output to control the fan relay
-const int CPU_FAN_PIN = A0; // measure CPU FAN speed
+const int NUC_USB_PIN = A0; // measure the USB power of the nuc's yellow USB port
 const int NUC_POWER_PIN = 6; // output to "press" (control) the power button on the nuc
 const int POWER_BUTTON_PIN = 4; // Human press this to turn the system on
+const int PSU_CONTROL_PIN = 9; // Control green "Switch" line on the PSU
 
 #define VERBOSE
 
@@ -27,7 +28,17 @@ void nuc_power_button(bool press) {
   } else {
     pinMode(NUC_POWER_PIN, INPUT);
   }
+}
 
+// true means "power on (connect)"
+// false means "power off (unconnect)"
+void psu_control(bool power) {
+  if(power) {
+    pinMode(PSU_CONTROL_PIN, OUTPUT);
+    digitalWrite(PSU_CONTROL_PIN, LOW);
+  } else {
+    pinMode(PSU_CONTROL_PIN, INPUT);
+  }
 }
 
 
@@ -39,10 +50,15 @@ void setup() {
 
   pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
 
-  pinMode(CPU_FAN_PIN, INPUT);
+  pinMode(NUC_USB_PIN, INPUT);
 
   pinMode(NUC_POWER_PIN, INPUT);
   nuc_power_button(false);
+
+  pinMode(PSU_CONTROL_PIN, INPUT);
+  psu_control(false);
+
+//  psu_control(true);
 
   pinMode(FAN_RELAY_PIN, OUTPUT);
   fan(1);
@@ -101,12 +117,41 @@ void setup() {
 
 typedef void (*Runnable)(unsigned long);
 
+#define STATE_OFF_FRESH 0
+#define STATE_OFF_WAIT 1
+
+int cstate = STATE_OFF_FRESH;
+
+unsigned long waita = 0;
+
 void power_sequence(const unsigned long now) {
 
-  // const bool cpu = digitalRead(CPU_FAN_PIN);
+
+  switch (cstate) {
+  case STATE_OFF_FRESH:
+    // what happens if cpu is already on?
+    waita = now;
+    // psu_control(true);
+
+    break;
+  
+  case STATE_OFF_WAIT:
+    if( (now-waita) > 900 ) {
+
+    }
+    break;
+  
+  default:
+    break;
+  }
+
+
+
+  // true if cpu is on
+  const bool cpu = digitalRead(NUC_USB_PIN);
 
   // Serial.println("CPU sees: " + String(cpu));
-  // Serial.println(String(cpu));
+  Serial.println(String(cpu));
 
   // true means press
   const bool human_button_press = !digitalRead(POWER_BUTTON_PIN);
