@@ -12,6 +12,10 @@ const int NUC_POWER_PIN = 6; // output to "press" (control) the power button on 
 const int POWER_BUTTON_PIN = 4; // Human press this to turn the system on
 const int PSU_CONTROL_PIN = 9; // Control green "Switch" line on the PSU
 
+
+// off time PSU needs to be off during a reboot
+const int PSU_OFF_REBOOT_TIME = 500;
+
 #define VERBOSE
 
 void fan(bool on) {
@@ -81,8 +85,9 @@ typedef void (*Runnable)(unsigned long);
 
 #define STATE_OFF_FRESH 0
 #define STATE_OFF_ASK 1
-#define STATE_OFF_WAIT 2
-#define STATE_CPU_ON 3
+#define STATE_OFF_ASK_2 2
+#define STATE_OFF_WAIT 3
+#define STATE_CPU_ON 4
 
 int cstate = STATE_OFF_FRESH;
 
@@ -93,6 +98,9 @@ void ps(void) {
     break;
   case STATE_OFF_ASK:
     Serial.println("STATE_OFF_ASK");
+    break;
+  case STATE_OFF_ASK_2:
+    Serial.println("STATE_OFF_ASK_2");
     break;
   case STATE_OFF_WAIT:
     Serial.println("STATE_OFF_WAIT");
@@ -108,7 +116,10 @@ void ps(void) {
 
 unsigned long waita = 0;
 unsigned long waitb = 0;
+unsigned long waitc = 0;
+unsigned long waitd = 0;
 int time_read_off = 0;
+int waitd_oneshot = 0;
 
 void power_sequence(const unsigned long now) {
 
@@ -123,6 +134,37 @@ void power_sequence(const unsigned long now) {
     ps();
     break;
   case STATE_OFF_ASK:
+
+    // during state off ASK
+    // it's possible that the CPU is doing a reboot
+    // in this case we need to wait a short bit, then turn the PSU on
+    // if the CPU doesn't come up afterwards after 30 seconds, then PSU goes off (cpu is really off)
+    if( (now-waitc) < PSU_OFF_REBOOT_TIME ) {
+      break;
+    }
+    Serial.println("glitch PSU on");
+    psu_control(true);
+    waitd = now;
+
+    cstate = STATE_OFF_ASK_2;
+    waitd_oneshot = 1;
+    ps();
+
+    break;
+
+  case STATE_OFF_ASK_2:
+    // when here, we've pulsed the PSU off, then back on
+    // now we need to wait and decide if it should ultimately be turned off
+
+    if( (now-waitd) > 30000 && waitd_oneshot == 1) {
+      // cpu is actually off
+      // PSU off
+      psu_control(false);
+      delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
+      // in this case we need the same delay as before
+      waitd_oneshot = 0;
+    }
+
     // what happens if cpu is already on?
     // waita = now;
     // psu_control(true);
@@ -131,7 +173,16 @@ void power_sequence(const unsigned long now) {
       cstate = STATE_OFF_FRESH;
       ps();
     }
+
+    // cpu turned on, it was probably a reset
+    if(digitalRead(NUC_USB_PIN)) {
+      cstate = STATE_CPU_ON;
+      waitb = now;
+      ps();
+    }
+
     break;
+
   
   case STATE_OFF_WAIT:
     if( (now-waita) > 900 ) {
@@ -166,11 +217,12 @@ void power_sequence(const unsigned long now) {
       psu_control(false);
       cstate = STATE_OFF_ASK;
       ps();
-      delay(300);
+      // delay(300);
       while(!digitalRead(POWER_BUTTON_PIN)) {
         Serial.println("blocking while button is held");
       }
-      ps();
+      waitc = millis();
+      // ps();
     }
 
     break;
