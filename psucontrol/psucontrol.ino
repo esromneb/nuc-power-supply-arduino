@@ -77,6 +77,14 @@ void setup() {
 
   pinMode(FAN_RELAY_PIN, OUTPUT);
   fan(1);
+  delay(75);
+  fan(0);
+  delay(75);
+  fan(1);
+  delay(75);
+  fan(0);
+  delay(75);
+  fan(1);
 
 
   pinMode(STAY_ON_SWITCH_PIN, INPUT_PULLUP);
@@ -89,7 +97,7 @@ void setup() {
   // digitalWrite(13, LOW);
 
   // give me a chance to open the monitor
-  delay(1500);
+  // delay(1500);
   Serial.begin(115200);
 }
 
