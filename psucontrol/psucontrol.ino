@@ -2,22 +2,37 @@
 // 13 output to relay
 // 12 is input from fan
 // 2 is a copy fo the 5v (wired to 5v from the 2nd usb (not the one onboard the arduino))
-// 3 is the relay to control the fans
 // A1 is the input from the current sensor
 
-const int CURRENT_PIN = A1;
-const int FAN_RELAY_PIN = 3;
+const int POWER_COPY = 2;
+const int CURRENT_PIN = A1; // drive current pin
+const int FAN_RELAY_PIN = 3; // output to control the fan relay
+const int CPU_FAN_PIN = A0; // measure CPU FAN speed
+const int NUC_POWER_PIN = 6; // control the power button on the nuc
+const int POWER_BUTTON_PIN = 4; // Press to turn the system on
 
 #define VERBOSE
+
+void fan(bool on) {
+  // LOW is on
+  digitalWrite(FAN_RELAY_PIN, !on);
+}
 
 
 // the setup function runs once when you press reset or power the board
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
   pinMode(13, OUTPUT);
-  pinMode(2, INPUT);
+  // pinMode(POWER_COPY, INPUT);
+
+  pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
+
+  pinMode(CPU_FAN_PIN, INPUT);
+
   pinMode(FAN_RELAY_PIN, OUTPUT);
-  digitalWrite(FAN_RELAY_PIN, LOW); // Fans on
+  fan(1);
+
+  
   
   digitalWrite(13, LOW);
 
@@ -36,30 +51,30 @@ void setup() {
 
 // 0 was off
 // 1 was on
-int state = 0;
+// int state = 0;
 
-void loop2() {
-  while(1) {
-    if(state == 0) {
-      int fan = analogRead(A0);
-      if(fan > 15) {
-        digitalWrite(13, HIGH);
-        state = 1;
-        break;
-      }
-    }
-    if(state == 1) {
-      int fan = analogRead(A0);
-      int vin = digitalRead(2);
-      if( (fan <= 15) || (vin == 0) ) {
-        digitalWrite(13, LOW);
-        state = 0;
-        delay(1000);
-        break;
-      }
-    }
-  }
-}
+// void loop2() {
+//   while(1) {
+//     if(state == 0) {
+//       int fan = analogRead(A0);
+//       if(fan > 15) {
+//         digitalWrite(13, HIGH);
+//         state = 1;
+//         break;
+//       }
+//     }
+//     if(state == 1) {
+//       int fan = analogRead(A0);
+//       int vin = digitalRead(POWER_COPY);
+//       if( (fan <= 15) || (vin == 0) ) {
+//         digitalWrite(13, LOW);
+//         state = 0;
+//         delay(1000);
+//         break;
+//       }
+//     }
+//   }
+// }
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
@@ -70,6 +85,15 @@ void loop2() {
 // }
 
 typedef void (*Runnable)(unsigned long);
+
+void power_sequence(const unsigned long now) {
+
+  const bool cpu = digitalRead(CPU_FAN_PIN);
+
+  // Serial.println("CPU sees: " + String(cpu));
+  Serial.println(String(cpu));
+}
+
 
 const int thresh = 506;
 unsigned long last_hdd_on = 0; // time that we've last seen the hdd's on
@@ -83,14 +107,14 @@ void read_hdd_current(const unsigned long now) {
 
   if( current <= thresh ) {
     last_hdd_on = now;
-    digitalWrite(FAN_RELAY_PIN, LOW); // Fans on
+    fan(1); // Fans on
 #ifdef VERBOSE
     Serial.println("Fans turned on with a current of: " + String(current));
 #endif
   }
 
   if( now - last_hdd_on >= hdd_fan_coast ) {
-    digitalWrite(FAN_RELAY_PIN, HIGH); // Fans off
+    fan(0); // Fans off
 #ifdef VERBOSE
     Serial.println("Fans turned off at time: " + String(now));
 #endif
@@ -104,7 +128,8 @@ void function2(const unsigned long now) {
 }
 
 // Array of function pointers
-Runnable functions[] = {read_hdd_current};
+Runnable functions[] = {power_sequence};
+// Runnable functions[] = {read_hdd_current};
 // Runnable functions[] = {read_hdd_current, function2};
 
 const int num_runnable = ARRAY_SIZE(functions);
@@ -113,7 +138,7 @@ const int num_runnable = ARRAY_SIZE(functions);
 unsigned long last_run[] = {0, 0};
 
 // Array of periods
-unsigned long period[] = {1000, 99999};
+unsigned long period[] = {10, 99999};
 
 
 
