@@ -8,8 +8,8 @@ const int POWER_COPY = 2;
 const int CURRENT_PIN = A1; // drive current pin
 const int FAN_RELAY_PIN = 3; // output to control the fan relay
 const int CPU_FAN_PIN = A0; // measure CPU FAN speed
-const int NUC_POWER_PIN = 6; // control the power button on the nuc
-const int POWER_BUTTON_PIN = 4; // Press to turn the system on
+const int NUC_POWER_PIN = 6; // output to "press" (control) the power button on the nuc
+const int POWER_BUTTON_PIN = 4; // Human press this to turn the system on
 
 #define VERBOSE
 
@@ -18,25 +18,40 @@ void fan(bool on) {
   digitalWrite(FAN_RELAY_PIN, !on);
 }
 
+// true means "press"
+// false means "unpress"
+void nuc_power_button(bool press) {
+  if(press) {
+    pinMode(NUC_POWER_PIN, OUTPUT);
+    digitalWrite(NUC_POWER_PIN, LOW);
+  } else {
+    pinMode(NUC_POWER_PIN, INPUT);
+  }
+
+}
+
 
 // the setup function runs once when you press reset or power the board
 void setup() {
   // initialize digital pin LED_BUILTIN as an output.
-  pinMode(13, OUTPUT);
+  // pinMode(13, OUTPUT);
   // pinMode(POWER_COPY, INPUT);
 
   pinMode(POWER_BUTTON_PIN, INPUT_PULLUP);
 
   pinMode(CPU_FAN_PIN, INPUT);
 
+  pinMode(NUC_POWER_PIN, INPUT);
+  nuc_power_button(false);
+
   pinMode(FAN_RELAY_PIN, OUTPUT);
   fan(1);
 
   
   
-  digitalWrite(13, LOW);
+  // digitalWrite(13, LOW);
 
-  delay(1000);
+  // delay(1000);
   Serial.begin(115200);
 }
 
@@ -88,10 +103,17 @@ typedef void (*Runnable)(unsigned long);
 
 void power_sequence(const unsigned long now) {
 
-  const bool cpu = digitalRead(CPU_FAN_PIN);
+  // const bool cpu = digitalRead(CPU_FAN_PIN);
 
   // Serial.println("CPU sees: " + String(cpu));
-  Serial.println(String(cpu));
+  // Serial.println(String(cpu));
+
+  // true means press
+  const bool human_button_press = !digitalRead(POWER_BUTTON_PIN);
+
+  // true will press
+  nuc_power_button(human_button_press);
+
 }
 
 
