@@ -67,78 +67,109 @@ void setup() {
   
   // digitalWrite(13, LOW);
 
-  // delay(1000);
+  // give me a chance to open the monitor
+  delay(1500);
   Serial.begin(115200);
 }
 
 
-// the loop function runs over and over again forever
-// void loop() {
-//   digitalWrite(13, HIGH);  // turn the LED on (HIGH is the voltage level)
-//   delay(3000);                      // wait for a second
-//   digitalWrite(13, LOW);   // turn the LED off by making the voltage LOW
-//   delay(250);                      // wait for a second
-// }
-
-// 0 was off
-// 1 was on
-// int state = 0;
-
-// void loop2() {
-//   while(1) {
-//     if(state == 0) {
-//       int fan = analogRead(A0);
-//       if(fan > 15) {
-//         digitalWrite(13, HIGH);
-//         state = 1;
-//         break;
-//       }
-//     }
-//     if(state == 1) {
-//       int fan = analogRead(A0);
-//       int vin = digitalRead(POWER_COPY);
-//       if( (fan <= 15) || (vin == 0) ) {
-//         digitalWrite(13, LOW);
-//         state = 0;
-//         delay(1000);
-//         break;
-//       }
-//     }
-//   }
-// }
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof(arr[0]))
 
-// void loop3() {
-//   int fan = analogRead(A0);
-//   Serial.println(fan);
-//   delay(75);
-// }
 
 typedef void (*Runnable)(unsigned long);
 
 #define STATE_OFF_FRESH 0
-#define STATE_OFF_WAIT 1
+#define STATE_OFF_ASK 1
+#define STATE_OFF_WAIT 2
+#define STATE_CPU_ON 3
 
 int cstate = STATE_OFF_FRESH;
 
+void ps(void) {
+  switch (cstate) {
+  case STATE_OFF_FRESH:
+    Serial.println("STATE_OFF_FRESH");
+    break;
+  case STATE_OFF_ASK:
+    Serial.println("STATE_OFF_ASK");
+    break;
+  case STATE_OFF_WAIT:
+    Serial.println("STATE_OFF_WAIT");
+    break;
+  case STATE_CPU_ON:
+    Serial.println("STATE_CPU_ON");
+    break;
+  
+  default:
+    break;
+  }
+}
+
 unsigned long waita = 0;
+unsigned long waitb = 0;
+int time_read_off = 0;
 
 void power_sequence(const unsigned long now) {
 
 
   switch (cstate) {
   case STATE_OFF_FRESH:
+    ps();
     // what happens if cpu is already on?
     waita = now;
+    psu_control(true);
+    cstate = STATE_OFF_WAIT;
+    ps();
+    break;
+  case STATE_OFF_ASK:
+    // what happens if cpu is already on?
+    // waita = now;
     // psu_control(true);
-
+    // cstate = STATE_OFF_WAIT;
+    if(!digitalRead(POWER_BUTTON_PIN)) {
+      cstate = STATE_OFF_FRESH;
+      ps();
+    }
     break;
   
   case STATE_OFF_WAIT:
     if( (now-waita) > 900 ) {
-
+      // turn the nuc on
+      // this could be broken out into new states
+      Serial.println("Pressing nuc to turn it on");
+      nuc_power_button(true);
+      delay(100);
+      nuc_power_button(false);
+      cstate = STATE_CPU_ON;
+      waitb = now;
+      ps();
     }
+    break;
+
+  case STATE_CPU_ON:
+    // two second lockout before this state will run
+    // waitb must be set before asking to switch to STATE_CPU_ON
+    if( (now-waitb) < 2000 ) {
+      break;
+    }
+
+    // true means press
+    // const bool human_button_press = !digitalRead(POWER_BUTTON_PIN);
+
+    // true will press
+    // pass the button through
+    nuc_power_button(!digitalRead(POWER_BUTTON_PIN));
+
+    if(!digitalRead(NUC_USB_PIN)) {
+      cstate = STATE_OFF_ASK;
+      ps();
+      delay(300);
+      while(!digitalRead(POWER_BUTTON_PIN)) {
+        Serial.println("blocking while button is held");
+      }
+    }
+
     break;
   
   default:
@@ -148,16 +179,10 @@ void power_sequence(const unsigned long now) {
 
 
   // true if cpu is on
-  const bool cpu = digitalRead(NUC_USB_PIN);
+  // const bool cpu = digitalRead(NUC_USB_PIN);
+  // Serial.println(String(cpu));
 
-  // Serial.println("CPU sees: " + String(cpu));
-  Serial.println(String(cpu));
-
-  // true means press
-  const bool human_button_press = !digitalRead(POWER_BUTTON_PIN);
-
-  // true will press
-  nuc_power_button(human_button_press);
+  
 
 }
 
@@ -220,14 +245,14 @@ void loop() {
   }
 }
 
-void loop4() {
-  const unsigned long now = millis();
-  int current = analogRead(A1);
-  Serial.println(current);
-  Serial.print("time: ");
-  Serial.println(now);
-  delay(75);
-}
+// void loop4() {
+//   const unsigned long now = millis();
+//   int current = analogRead(A1);
+//   Serial.println(current);
+//   Serial.print("time: ");
+//   Serial.println(now);
+//   delay(75);
+// }
 
 
 
