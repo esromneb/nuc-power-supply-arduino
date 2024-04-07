@@ -156,13 +156,14 @@ void power_sequence(const unsigned long now) {
     // when here, we've pulsed the PSU off, then back on
     // now we need to wait and decide if it should ultimately be turned off
 
-    if( (now-waitd) > 30000 && waitd_oneshot == 1) {
+    if( (now-waitd) > 20000 && waitd_oneshot == 1) {
       // cpu is actually off
       // PSU off
       psu_control(false);
       delay(PSU_OFF_REBOOT_TIME); // prevent case where button is pressed on this frame
       // in this case we need the same delay as before
       waitd_oneshot = 0;
+      Serial.println("system really was off, turning off PSU");
     }
 
     // what happens if cpu is already on?
